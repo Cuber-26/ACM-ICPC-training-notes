@@ -1,0 +1,572 @@
+## xcpc 基础补全计划：动态规划篇
+### Day 3: 线性DP (1)
+
+### 2.1 最长上升子序列 $(LIS)$
+#### 2.1.1 $LIS$ 模板
+##### 问题描述
+给定由 $n$ 个正整数组成的序列，求其中最长的严格上升子序列长度。
+
+##### 题解
+前一节背包 $dp$ 中，我们经常先考虑前面若干个数组成的子问题如何解决。在这里我们不妨试着模仿一下前面的解法。
+
+设 $dp[i]$: 以第 $i$ 个数结尾的最长上升子序列的长度。最初我们一定有 $dp[1] = 1$，为了后续方便，我们可以先初始化所有 $dp[i] = 1$，因为哪怕在最极端情况下，第 $i$ 个数本身也是一个长度为 $1$ 的上升子序列，后续我们如果找到更长的上升子序列，可以和 $dp[i]$ 取 $\max$ 将结果覆盖掉。这样很容易想到一个 $O(n^2)$ 的状态转移：
+
+$$ dp[i] = \max_{j=0}^{i-1} \{dp[i], dp[j] + 1\}, a[j] < a[i].$$
+
+上述转移的意义是：当我们引进 $a[i]$ 时，要以它作为上升子序列的结尾，则一定要找到上一个比它小的数 $a[j]$，让它接在 $a[j]$ 的后面，于是得到的上升子序列长度就是 **以 $j$ 结尾的序列长度 $+1$.** 然后在所有满足这样条件的 $j$ 当中取出最优的一个结果。
+
+在这种状态设计与转移下，第 $i$ 个数的引入并不会影响前面的数所求出的 $dp$ 值，这是无后效性；与此同时如果用于转移的某个 $dp[j]$ 并非最优解，那么根据原来的转移方程，得到的 $dp[j] + 1$ 也不会是最优的，这也就要求出现在前面的数对应的最优解需要作为后面序列最优解的一部分，这就是最优子结构。
+
+##### 从 $O(n^2)$ 到 $O(n\log n)$ 的优化
+考虑 $d[k]$: 长度恰为 $k$ 的上升子序列中结尾最小值。首先我们初始化 $d[k] = \infty, k = 1,2,...,n.$ 遍历序列，当遍历到第 $i$ 个数时，我们可以对 $d$ 数组二分，找到最小的 $k$ 使得 $d[k] \geq a[i]$，然后将 $d[k]$ 替换为 $a[i]$。当整个数组 $a$ 遍历结束后，$d$ 数组的有效长度就是数组 $a$ 的 $LIS$ 长度。
+
+例如考虑序列 $[3,1,4,1,5,9,2,6]$:
+
+- $i = 1$: $d = [3]$, 覆盖 $d[1]$;
+- $i = 2$: $d = [1]$, 覆盖 $d[1]$;
+- $i = 3$: $d = [1,4]$, 覆盖 $d[2]$;
+- $i = 4$: $d = [1,4]$, 覆盖 $d[1]$;
+- $i = 5$: $d = [1,4,5]$, 覆盖 $d[3]$;
+- $i = 6$: $d = [1,4,5,9]$, 覆盖 $d[4]$;
+- $i = 7$: $d = [1,2,5,9]$, 覆盖 $d[2]$;
+- $i = 8$: $d = [1,2,5,6]$, 覆盖 $d[4]$;
+
+最终得到 $LIS$ 长度为 $4$.
+
+##### 证明
+**引理 $1$：$d$ 数组在放完前任意个数字后保持严格单调递增。**
+
+$Proof$: 对现在已经放置的数字个数 $i$ 做数学归纳，当 $i=1$ 时 $d$ 显然是严格单调递增的。假设当 $i = k-1$ 时 $d$ 严格单调递增，且此时 $d$ 数组长度为 $l$，那么 $i = k$ 时有以下情况：
+
+- 若 $a_k > d[l]$，由于 $a_k$ 需要在 $d$ 中覆盖第一个大于等于自己的数，这个数此时是 $d[l+1] = \infty$，所以覆盖掉 $d[l+1]$ 后仍然保持 $d$ 严格单增；
+- 若 $a_k \leq d[l]$，假设它覆盖的是 $d[p]$，那么有 $d[p-1] < a_k \leq d[p]$，于是修改后的 $d$ 数组为 $$d[1] < ... d[p-1] < a_k < d[p+1] < ... < d[l],$$
+
+它仍然保持单调递增。
+
+**引理 $2$：$d$ 数组长度 $\geq$ $LIS$ 长度。**
+
+$Proof$: 设 $c_1 < c_2 < ... < c_l$ 是一组 $LIS$.
+
+考虑任意的 $c_i$ 与 $c_{i+1}$. 首先 $c_{i+1}$ 与 $c_i$ 不会在 $d$ 数组中覆盖相同的位置，否则一定有 $c_{i+1} \leq c_i$. 其次 $c_{i+1}$ 覆盖 $d$ 的位置不会比 $c_i$ 更靠前的位置，否则它将破坏 $d$ 数组的严格单增性，由引理 $1$ 这是不可能的，所以 $c_{i+1}$ 覆盖的位置只能比 $c_i$ 严格靠后，这也就是说 $d$ 数组的长度 $\geq l.$
+
+**引理 $3$: $d$ 数组长度 $\leq$ $LIS$ 长度。**
+
+$Proof$: 假设在 $d$ 数组中放置 $a_i$ 前，$d$ 数组的长度为 $p-1$. 放置 $a_i$ 时要让 $d$ 数组长度变为 $p$，当且仅当 $a_i$ 的值大于此时的 $d[p-1]$. 而 $d[p-1]$ 一定是 $a_1,...a_{i-1}$ 中的某个数，所以我们就找到了一个 $a_j$ 使得 $a_j < a_i$. 接下来再对 $a_j$，也就是 $d[p-1]$ 做出同样的讨论，可以发现这个讨论一定能够进行到 $d$ 数组为空。每次都会让 $d$ 的长度 $-1$，所以该过程能够进行 $p$ 次，于是我们就找到了一个长为 $p$ 的上升子序列。
+
+因此假设最后数组 $d$ 的长度为 $l$，一定能找到一个长为 $l$ 的上升子序列。这也就是说 $LIS$ 长度 $\geq$ $d$ 数组长度。
+
+由引理 $2$ 和引理 $3$，必有 $LIS$ 长度 $= d$ 数组长度。
+
+熟练掌握这个证明过程，可以让自己很轻松地写出 $O(n\log n)$ 的 $LIS$ 解法。
+
+##### 模板题
+- 洛谷 B3637
+
+##### 模板代码
+```cpp
+#include <bits/stdc++.h>
+#define int long long
+using namespace std;
+const int inf = 1e18;
+int a[100005], d[100005];
+
+int find(int x, int len){
+	int l = 0, r = len + 2;
+	while(r - l > 1){
+		int mid = (l + r) / 2;
+		if(d[mid] >= x) r = mid;
+		else l = mid;
+	}
+	return r;
+}
+
+signed main(){
+	int n; cin >> n;
+	for(int i = 1; i <= n; i++) d[i] = inf;
+	int len = 0;
+	for(int i = 1; i <= n; i++){
+		cin >> a[i];
+		int p = find(a[i], len);
+		d[p] = a[i];
+		if(p > len) len++;
+	}
+	cout << len;
+}
+```
+
+#### 2.1.2 输出 $LIS$ 方案
+
+引理 $3$ 的证明过程其实已经给出了一种 $LIS$ 的构造方法。我们在将 $a_i$ 放入 $d$ 数组时，其实可以再单独用一个数组 $pos$ 记录下每个 $a_i$ 放入 $d$ 数组的下标。假设已经得到了 $LIS$ 的长度为 $l$，我们只需倒序遍历 $pos$，沿途取最先遇到的 $pos[i] = l, l-1,..., 1$ 对应的 $a[i]$ 即可。例如：
+
+|   $i$    | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|   ---    |---|---|---|---|---|---|---|---|
+|  $a[i]$  | 3 | 1 | 4 | 1 | 5 | 9 | 2 | 6 |
+| $pos[i]$ | 1 | 1 | 2 | 1 | 3 | 4 | 2 | 4 |
+
+倒序遍历 $pos[i]$，沿途取最先出现 $4,3,2,1$ 的位置，得到一组 $$LIS = [a[2], a[3], a[5], a[8]] = [1,4,5,6].$$
+
+这样输出方案额外增加 $O(n)$ 的时间，与求 $LIS$ 长度的过程相比并不算复杂度瓶颈。
+
+#### 2.1.3 输出数组中 $LIS$ 的个数
+##### 模板题 Leetcode 673. 最长递增子序列的个数
+$O(n^2)$ 做法是简单的。实际上 $pos[i]$ 不仅代表 $i$ 在数组 $d$ 中覆盖的位置，同样也是以 $a[i]$ 结尾的 $LIS$ 长度。由前面提到的构造方法，以 $a[i]$ 结尾的 $LIS$ 长度恰好等于 $pos[i]$。所以如果我们设 $cnt[i]$: 以 $i$ 结尾的 $LIS$ 个数，不难发现：
+
+- 若 $pos[i] = 1$, 则 $cnt[i] = 1$；
+- 若 $pos[i] > 1$, 则 $cnt[i]$ 将完全由所有满足 $j < i, pos[j] = pos[i] - 1, a[j] < a[i]$ 的 $cnt[j]$ 转移而来，即
+$$ cnt[i] = \sum cnt[j], (j < i, pos[j] = pos[i] - 1, a[j] < a[i]). $$
+
+遍历所有的 $j < i$ 进行转移即可，时间复杂度 $O(n^2)$. $O(n\log n)$ 的做法需要用到树状数组，等我加训到数据结构时会继续讨论这个问题。
+
+##### 通过代码
+```cpp
+class Solution {
+    const int inf = 1e7;
+    int d[2002], pos[2002], cnt[2002];
+
+public:
+    void init(int x){
+        cnt[0] = 1;
+        for(int i = 1; i <= x; i++) d[i] = inf, cnt[i] = 0;
+    }
+    int find(int x, int y){
+        int l = 0, r = y + 2;
+        while(r - l > 1){
+            int mid = (l + r) / 2;
+            if(d[mid] >= x) r = mid;
+            else l = mid;
+        }
+        return r;
+    }
+    int findNumberOfLIS(vector<int>& nums) {
+        init(nums.size());
+        int len = 0;
+        for(int i = 0; i < nums.size(); i++){
+            int p = find(nums[i], len);
+            d[p] = nums[i], pos[i+1] = p;
+            if(p > len) len++;
+        }
+        int ans = 0;
+        for(int i = 1; i <= nums.size(); i++){
+            if(pos[i] == 1){
+                cnt[i] = 1;
+                if(pos[i] == len) ans += cnt[i];
+            }
+            else{
+                for(int j = 1; j < i; j++){
+                    if(pos[j] == pos[i]-1 && nums[j-1] < nums[i-1]){
+                        cnt[i] += cnt[j];
+                    }
+                if(pos[i] == len) ans += cnt[i];
+            }
+        }
+        return ans;
+    }
+};
+```
+
+#### 2.1.4 最长不上升子序列 (可取等情形)
+##### 练习题 洛谷 P1020: 导弹拦截
+给出一个正整数数组，回答以下两个问题，每个问题输出一行整数：
+
+- (1) 其中的最长不上升子序列长度；
+- (2) 要想完全覆盖数组，需要的最少的不上升子序列的个数。
+
+##### 问题 $1$
+在原来的 $LIS$ 问题中，我们用 $a[i]$ 覆盖数组 $d$ 时，覆盖的是 $d[k] \geq a[i]$ 的最小 $k$。在这个问题中，我们只需要先把所有的 $d[k]$ 初始化为 $-\infty$，再覆盖满足 $d[k] < a[i]$ 的最小 $k$ 即可。
+
+##### 问题 $2$（Dilworth 定理）
+对任意有限偏序集 $(S, \leq)$，其最大反链中元素个数的数目等于最小链划分中链的数目。反链的定义是 $S$ 的一个子集 $C$，其中 $C$ 中的元素两两不存在偏序。
+
+这个定理的 **对偶形式** 是：偏序集中最长链的元素个数等于最小反链划分中反链的数目。该命题和原定理真假性是一致的，所以我们考虑证明该对偶形式。
+
+##### 证明
+假设最长链的长度是 $n$. 如果偏序集 $(S, \leq)$ 能够被分解为不超过 $n-1$ 条反链，由鸽巢原理至少有最长链中的两个元素被分解到同一反链中，与反链的定义产生矛盾。
+
+下面我们要证明确实存在一种方法能够将偏序集分解为 $n$ 条反链：首先我们取 $S$ 中所有极大元构成集合 $B_1$，显然 $B_1$ 是一条反链，接下来将 $B_1$ 从原偏序集中删除，考虑集合 $S - B_1$：由于原来所有的极大元都被删除，这意味着所有的链长度都减 $1$。对 $S-B1$ 重复取出所有极大元的操作得到集合 $B_2$... 由于最长链的长度是 $n$，这种操作恰好进行 $n$ 次，于是我们取出了 $n$ 条反链，证明完毕。
+
+##### 题解
+首先我们要建立导弹集合的偏序，关于导弹的偏序集 $S$ 是一个 $\mathbb{Z_n} \times \mathbb{Z_n}$ 的子集，$(i,j) \in S$ 当且仅当 $i \leq j$ 且 $a_i \geq a_j$. 容易验证这确实是一个偏序，而且该偏序集中的一条链就是不上升子序列，每取出一条链就对应一套导弹拦截系统，所以题目要我们找到最小的导弹拦截系统数目，完全等价于将偏序集划分为最少的链的数目。于是我们可以运用 Dilworth 定理，找到原偏序集中最大反链的元素个数。
+
+要找一条反链，也就是说要找到 $\mathbb{Z_n}$ 的一个子集 $C$，使得任取 $i < j \in C$，都有 $a_i > a_j$. 这其实就是上升子序列，也就是说我们只需要找到 $LIS$ 的长度，就对应了原问题的答案。
+
+##### 通过代码
+```cpp
+#include <bits/stdc++.h>
+#define int long long
+using namespace std;
+const int inf = 1e18;
+int a[100005], d[2][100005], pos[2][100005];
+
+void init(int x){
+	for(int i = 1; i <= x; i++) d[0][i] = -inf, d[1][i] = inf;
+}
+
+int find(int x, int y, int type){
+	int l = 0, r = y + 2;
+	while(r - l > 1){
+		int mid = (l + r) / 2;
+		if(type == 0){
+			if(d[type][mid] < x) r = mid;
+			else l = mid;
+		}else{
+			if(d[type][mid] >= x) r = mid;
+			else l = mid;
+		}
+	}
+	return r;
+}
+
+int FindSequence(int n, int type){  // 0: LDS, 1: LIS
+	int cnt = 0;
+	for(int i = 1; i <= n; i++){
+		int p = find(a[i], cnt, type);
+		d[type][p] = a[i], pos[type][i] = p;
+		if(p > cnt) cnt++;
+	}
+	return cnt;
+}
+
+signed main(){
+	int tmp, n = 0;
+	while(cin >> tmp){
+		n++, a[n] = tmp;
+		if(getchar() == '\n') break;
+	}
+	init(n);
+	cout << FindSequence(n, 0) << "\n" << FindSequence(n, 1);
+	return 0;
+}
+```
+
+### Day 4: 线性DP (2)
+
+### 2.2 最长公共子序列 $(LCS)$
+#### 2.2.1 $LCS$ 模板
+##### 问题描述
+给定字符串 $text1, text2$，返回两个字符串的最长公共子序列长度。
+
+##### 题解
+假设两个字符串的长度分别是 $m$, $n$. 我们可以设计如下状态：
+
+$dp[i][j]$: 仅考虑 $text1$ 的前 $i$ 个字符和 $text2$ 的前 $j$ 个字符，初始状态为 $dp[0][j] = 0, j \geq 0$. 那么会有状态转移：
+
+- 若 $text1[i]$ != $text2[j]$, 则 $dp[i][j]$ 由 $dp[i][j-1]$ 转移过来；
+- 若 $text1[i]$ == $text2[j]$, 则 $dp[i][j]$ 不仅由 $dp[i][j-1]$ 转移过来，还可以由 $dp[i-1][j-1] + 1$ 转移过来。
+
+以上两种状态无论哪一种，$dp[i][j]$ 的结果均不会低于 $dp[i-1][j]$，所以还要与它取 $\max$，因此状态转移方程为
+
+$$
+dp[i][j] = \begin{cases}
+\max(dp[i-1][j-1] + 1, dp[i][j-1], dp[i-1][j]) & text1[i] = text2[j], \\\\
+\max(dp[i][j-1], dp[i-1][j]) & text1[i] \neq text2[j].
+\end{cases}
+$$
+
+以上算法的时间复杂度是 $O(mn)$.
+
+我们可以看到每一个 $dp[i][j]$ 仅由 $dp[i-1]$ 或 $dp[i]$ 推出，所以这里可以使用 **交替数组** 的方式进行优化。具体来说，我们只需要两个数组 $dp[0], dp[1]$，其中 $dp[0]$ 保存上一行的信息，$dp[1]$ 用来记录当前这一行的信息。当所有的 $dp[1]$ 都被记录完毕以后，我们只需让 $dp[1]$ 完全覆盖 $dp[0]$，进行新一轮的转移即可。
+
+以较短的字符串作为 $text2$，就可以将空间复杂度降低到 $O(min(m,n))$.
+
+##### 模板题
+- Leetcode 1143. 最长公共子序列
+
+##### 通过代码
+```cpp
+class Solution {
+    #define longestCommonSubsequence LCS
+public:
+    int dp[2][1001];
+    int LCS(string text1, string text2) {
+        int l1 = text1.length(), l2 = text2.length();
+        for(int j = 0; j <= l2; j++) dp[0][j] = 0;
+        dp[1][0] = 0;
+        for(int i = 1; i <= l1; i++){
+            for(int j = 1; j <= l2; j++){
+                if(text1[i-1] == text2[j-1]){
+                    dp[1][j] = max(dp[0][j-1] + 1, max(dp[1][j-1], dp[0][j]));
+                }else dp[1][j] = max(dp[1][j-1], dp[0][j]);
+            }
+            for(int j = 0; j <= l2; j++) dp[0][j] = dp[1][j];
+        }
+        return dp[0][l2];
+    }
+};
+```
+
+#### 2.2.2 $LCS$ 转化为 $LIS$ 的特殊情形
+假设在串 $A$ 或串 $B$ 中至少一个满足：在串中每个字符至多出现一次，不妨设是串 $A$，那么在串 $A$ 中就存在一个元素到自然数的双射：
+
+$$\begin{aligned}
+f: A & \rightarrow \mathbb{N} \\
+      A[i] & \mapsto i
+\end{aligned}$$
+
+这样做以后，只要在串 $B$ 当中有 $A$ 的元素出现，我们就可以将这个元素映射成一个自然数。把转换成自然数过后的这个序列称为 $c$，由于子序列需要保持元素出现的顺序不变，所以这个问题就转化成了求 $c$ 中 $LIS$ 的长度。
+
+##### 模板题 洛谷 P1439: 两个排列的最长公共子序列
+```cpp
+#include <bits/stdc++.h>
+#define int long long
+using namespace std;
+const int inf = 1e18;
+
+int pos[200005], c[200005];
+int d[200005];
+
+int find(int x, int y){
+	int l = 0, r = y+2;
+	while(r - l > 1){
+		int mid = (l+r)/2;
+		if(d[mid] >= x) r = mid;
+		else l = mid;
+	}
+	return r;
+}
+
+int LIS(int n){
+	for(int i = 0; i <= n; i++) d[i] = inf;
+	int cnt = 0;
+	for(int i = 1; i <= n; i++){
+		int p = find(c[i], cnt);
+		d[p] = c[i]; 
+		if(p > cnt) cnt++;
+	}
+	return cnt;
+}
+
+signed main(){
+	int n; cin >> n;
+	for(int i = 1; i <= n; i++){
+		int tmp; cin >> tmp;
+		pos[tmp] = i;
+	}
+	for(int i = 1; i <= n; i++){
+		int tmp; cin >> tmp;
+		c[i] = pos[tmp];
+	}
+	cout << LIS(n);
+}
+```
+
+### 2.3 最大子数组和
+#### 问题描述
+给定一个数组 $a_1,...,a_n$，求其中所有非空的子数组中最大的和是多少。
+
+##### 题解
+这题的解法非常简单。用 $ans$ 存下最终结果，用 $cur$ 存下当前记录子数组的和，初始化 $ans = -\infty$，$cur = 0$. 我们顺着扫一遍数组 $a$，每次让 $cur = cur + a[i]$，然后更新 $ans = max(ans, cur)$，如果 $cur < 0$，我们立刻重置 $cur = 0$ 即可。当整个数组被扫完，最后的结果就是 $ans$. 
+
+直观理解，如果当前这段子数组的和已经小于 $0$，那么我们不如扔掉这段子数组重新开始。例如我们此时统计的是 $a_i$ 到 $a_j$ 的部分（$i \leq j$），由于在这段是第一次遇到小于 $0$ 的情况，所以 $a_k$ 到 $a_j\ (i < k \leq j)$ 这个部分和只会更小；前面所说的是把起点往后放的情况。如果起点往前放也不会让结果更大，因为假如往前放会更优，说明在 $a_i$  到 $a_j$ 前有一小段和是正的，那么前面的那一段也就不会完全被扔掉了。
+
+另一个例子：众所周知 Codeforces 初始账号 $rating$ 为 $1400$. 假如你一直在打比赛，但某个时候 $rating$ 直接跌破了 $1400$，那么对你来说还不如直接重新起号，这样在下一场比赛就会拥有更高的起点（bushi）
+
+##### 模板题
+- Leetcode 53. 最大子数组和
+
+##### 通过代码
+```cpp
+class Solution {
+    const int inf = 1e9;
+public:
+    int maxSubArray(vector<int>& nums) {
+        int ans = -inf, cur = 0;
+        for(int i = 0; i < nums.size(); i++){
+            cur += nums[i];
+            ans = max(ans, cur);
+            if(cur < 0) cur = 0;
+        }
+        return ans;
+    }
+};
+```
+
+### 2.4 编辑距离问题
+#### 问题描述
+给定字符串 $A$ 和 $B$，允许对任意字符串执行以下编辑操作：
+
+- 将其中一个字符修改为另一个字符；
+- 向字符串中插入一个字符；
+- 删去字符串中的一个字符。
+
+输出由一个字符串变成另一个字符串需要修改的最小次数。
+
+#### 题解
+首先我们可以固定字符串 $A$，仅仅修改字符串 $B$：
+
+- 向 $A$ 中插入一个字符等价于删去 $B$ 中的一个字符。因为插入的这个字符不能白插，肯定是 $B$ 中原先就有的某个字符。那么我们只要把 $B$ 中这个字符删掉，同样能在 $1$ 次修改操作下达到相同的匹配效果；
+- 删除 $A$ 中的一个字符完全等价于向 $B$ 中合适的位置插入那个要删的字符，理由和上面一致。
+
+在这种情况下，我们不妨考虑设计状态如下：
+
+$dp[i][j]$: 仅考虑串 $A$ 的前 $i$ 个字符，串 $B$ 的前 $j$ 个字符，需要对串 $B$ 执行的最小修改次数。显然有边界状态 $dp[0][i] = i, dp[j][0] = j$.
+
+$dp[i][j]$ 如何从其它状态转移过来呢？考虑几种修改方式：
+
+- 修改 $B$ 的最后一个字符（注意根据状态设计，这里的“最后一个”指的是前 $j$ 个字符构成的子串的最后一个），那么此时的状态取决于 $dp[i-1][j-1]$ 与 $A[i] = B[j]$ 是否成立，因此有状态转移 $dp[i][j] = dp[i-1][j-1] + (A[i] == B[j])$. 第二项是一个逻辑表达式，为真时取 $1$，否则取 $0$.
+- 在 $B$ 的最后添加一个字符（同上），我们肯定是要让新添加的字符等于 $A[i]$ 才合理，所以此时这种修改依赖于状态 $dp[i-1][j]$，有状态转移 $dp[i][j] = dp[i-1][j] + 1$；
+- 删去 $B$ 的最后一个字符，那么有状态转移 $dp[i][j] = dp[i][j-1] + 1$.
+
+在上面的三种状态转移中取最小的那一个即可，也就是
+
+$$\begin{aligned}
+dp[i][j] = min\{&dp[i-1][j-1] + (A[i] == B[j]), \\
+&dp[i-1][j] + 1, \\
+&dp[i][j-1] + 1.\}
+\end{aligned}$$
+
+#### 为什么上述状态转移只需考虑最后一个字符？
+根据动态规划的最优子结构，前面的字符早就被考虑过了。
+
+#### 模板题
+- Leetcode 72. 编辑距离
+
+##### 通过代码
+```cpp
+class Solution {
+public:
+    const int inf = 1e6;
+    int dp[2][501];
+    int minDistance(string word1, string word2) {
+        int l1 = word1.size(), l2 = word2.size();
+        for(int j = 0; j <= l2; j++) dp[0][j] = j;
+        for(int i = 1; i <= l1; i++){
+            dp[1][0] = i;
+            for(int j = 1; j <= l2; j++){
+                if(word1[i-1] == word2[j-1]) dp[1][j] = dp[0][j-1];
+                else dp[1][j] = dp[0][j-1] + 1;
+                dp[1][j] = min(dp[1][j], dp[0][j] + 1);
+                dp[1][j] = min(dp[1][j], dp[1][j-1] + 1);
+            }
+            for(int j = 0; j <= l2; j++) dp[0][j] = dp[1][j];
+        }
+        return dp[0][l2];
+    }
+};
+```
+
+### 2.5 练习题
+#### 2.5.1 二维 $LIS$
+##### 练习题 Codeforces 4D: Mysterious Present
+给定 $n$ 个信封和一封宽度为 $w_0$，高度为 $h_0$ 的信件，每个信封的宽度和高度分别为 $w_i$ 和 $h_i$. 信封 $i$ 能装下信封 $j$ 当且仅当 $w_i > w_j$ 且 $h_i > h_j$，信件可以被视为第 $0$ 个信封。下面我们要找到所有信封嵌套序列中最长的那一组 $0, k_1, ..., k_l$。如果有多组最长的序列，输出其中一组即可。
+
+首先我们当然要把没有办法装下 $0$ 号信封的所有信封筛选出去，留下的这些信封可以先以宽度为第一关键字升序排列。由于相同宽度的信封只能选出一个，如果再以高度为第二关键字降序排列，当所有信封排列完毕后，如果只考虑高度序列，那么找最长的信封序列就完全等价于找到一组 $LIS$. 接下来只需要执行 $LIS$ 模板即可。
+
+##### 通过代码
+```cpp
+#include <bits/stdc++.h>
+#define int long long
+using namespace std;
+const int inf = 1e9;
+
+struct Node{
+	int w,h,id;
+}node[5001];
+
+bool cmp(Node &a, Node &b){
+	if(a.w < b.w) return 1;
+	else if(a.w == b.w){
+		if(a.h > b.h) return 1;
+		else if(a.h == b.h) return a.id < b.id;
+		else return 0;
+	}
+	else return 0;
+}
+
+int d[5001], pos[5001];
+vector<int> ans;
+void init(int x){
+	for(int i = 0; i <= x; i++) d[i] = inf, pos[i] = 0;
+}
+
+int find(int x, int y){
+	int l = 0, r = y+2;
+	while(r - l > 1){
+		int mid = (l + r) / 2;
+		if(d[mid] >= x) r = mid;
+		else l = mid;
+	}
+	return r;
+}
+
+signed main(){
+	ans.clear();
+	int n,w0,h0; cin >> n >> w0 >> h0;
+	int cnt = 0;
+	for(int i = 1; i <= n; i++){
+		int w1,h1; cin >> w1 >> h1;
+		if(w1 > w0 && h1 > h0){
+			cnt++;
+			node[cnt].w = w1, node[cnt].h = h1;
+			node[cnt].id = i;
+		}
+	}
+	if(cnt == 0){
+		cout << 0;
+		return 0;
+	}
+	sort(node+1, node+cnt+1, cmp);
+	init(cnt);
+	int lis = 0;
+	for(int i = 1; i <= cnt; i++){
+		int p = find(node[i].h, lis);
+		d[p] = node[i].h, pos[i] = p;
+		if(p > lis) lis++;
+	}
+	for(int i = cnt; i >= 1; i--){
+		if(pos[i] == lis){
+			lis--;
+			ans.insert(ans.begin(), node[i].id);
+		}
+		if(lis == 0) break;
+	}
+	cout << ans.size() << "\n";
+	for(auto it: ans) cout << it << " ";
+	return 0;
+}
+```
+
+#### 2.5.2 简单的线性 DP 模型问题
+##### 练习题 Codeforces 455A: Boredom
+给定序列 $a_1,...,a_n$，可以执行以下任意次操作：
+
+- 删去 $a_k$，则序列中所有值为 $a_k-1$ 和 $a_k+1$ 的数也要被同时删去。这次操作会获得 $a_k$ 分。
+
+输出对这个序列执行操作可以获得的最大分数。
+
+我们发现最终的分数只与序列当中有哪些数字有关。接下来我们不妨开一个桶 $cnt$，用于统计每个数字各出现了多少次。下面设计状态：
+
+$dp[i]$: 只对小于等于 $i$ 的数字执行主动的删除操作可获得的最高分（注意，设计状态强调了主动删去，所以删掉 $i$ 的时候会删去所有的 $i+1$，但这不影响我们的状态）。
+
+边界状态显然有 $dp[0] = 0, dp[1] = cnt[1]$.
+
+考虑 $dp[i]$ 如何得到。我们发现它由两种状态转移而来：
+
+- 先考虑对所有小于等于 $i-2$ 的数执行删除操作，再额外删去这 $cnt[i]$ 个 $i$，这样获得的分数是 $dp[i-2] + i * cnt[i]$；
+- 考虑对所有小于等于 $i-1$ 的数执行删除操作，那么 $i$ 此时不在数组里，无法再获取分数，所以最终获得 $dp[i-1]$ 的分数。**数组里可能没有 $i-1$，此时它会自动被归为上一种情况，所以不影响答案正确性。**
+
+最终有状态转移方程 $dp[i] = max(dp[i-1], dp[i-2] + i * cnt[i])$.
+
+##### 通过代码
+```cpp
+#include <bits/stdc++.h>
+#define int long long
+using namespace std;
+
+int cnt[100005], dp[100005];
+
+signed main(){
+	int n; cin >> n;
+	for(int i = 1; i <= n; i++) cnt[i] = 0;
+	int maxvalue = 0;
+	for(int i = 1; i <= n; i++){
+		int tmp; cin >> tmp;
+		cnt[tmp]++;
+		maxvalue = max(maxvalue, tmp);
+	}
+	dp[0] = 0, dp[1] = cnt[1];
+	for(int i = 2; i <= maxvalue; i++){
+		dp[i] = max(dp[i-2] + i * cnt[i], dp[i-1]);
+	}
+	cout << dp[maxvalue];
+}
+```
